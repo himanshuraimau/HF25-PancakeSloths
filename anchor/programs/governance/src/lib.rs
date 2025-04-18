@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
-declare_id!("BMgw77fmd4FubdeFcZKixH5gnYY76Z11w12hwtqiQ5qU");
+declare_id!("Govz1Vy1h2fteYoWfD75UGj6XtgKQdW3tKkwD8Tigq6u");
 
 #[program]
 pub mod governance {
@@ -16,12 +16,11 @@ pub mod governance {
         
         // Initialize proposal
         proposal.creator = ctx.accounts.creator.key();
+        proposal.governance = governance.key();
         proposal.title = params.title;
         proposal.description = params.description;
         proposal.category = params.category;
-        proposal.status = ProposalStatus::Active;
-        proposal.created_at = Clock::get()?.unix_timestamp;
-        proposal.updated_at = Clock::get()?.unix_timestamp;
+        proposal.status = ProposalStatus::Draft;
         proposal.voting_start = params.voting_start;
         proposal.voting_end = params.voting_end;
         proposal.quorum = params.quorum;
@@ -29,60 +28,47 @@ pub mod governance {
         proposal.yes_votes = 0;
         proposal.no_votes = 0;
         proposal.abstain_votes = 0;
+        proposal.total_votes = 0;
+        proposal.created_at = Clock::get()?.unix_timestamp;
+        proposal.updated_at = Clock::get()?.unix_timestamp;
         
-        // Update governance state
-        governance.total_proposals = governance.total_proposals.checked_add(1)
-            .ok_or(GovernanceError::Overflow)?;
-        governance.active_proposals = governance.active_proposals.checked_add(1)
-            .ok_or(GovernanceError::Overflow)?;
+        // Update governance
+        governance.active_proposals = governance.active_proposals.checked_add(1).unwrap();
+        governance.total_proposals = governance.total_proposals.checked_add(1).unwrap();
+        governance.updated_at = Clock::get()?.unix_timestamp;
         
         Ok(())
     }
 
     pub fn cast_vote(
         ctx: Context<CastVote>,
-        vote: VoteType,
-        amount: u64,
+        vote: Vote,
     ) -> Result<()> {
+        let vote_record = &mut ctx.accounts.vote_record;
         let proposal = &mut ctx.accounts.proposal;
-        let voter = &mut ctx.accounts.voter;
         
-        // Validate voting period
+        // Check if voting period is active
         let current_time = Clock::get()?.unix_timestamp;
         require!(
             current_time >= proposal.voting_start && current_time <= proposal.voting_end,
             GovernanceError::NotInVotingPeriod
         );
         
-        // Validate proposal status
-        require!(
-            proposal.status == ProposalStatus::Active,
-            GovernanceError::ProposalNotActive
-        );
+        // Initialize vote record
+        vote_record.voter = ctx.accounts.voter.key();
+        vote_record.proposal = proposal.key();
+        vote_record.vote = vote;
+        vote_record.weight = ctx.accounts.voter_token_account.amount;
+        vote_record.created_at = current_time;
         
-        // Update vote counts
+        // Update proposal votes
         match vote {
-            VoteType::Yes => {
-                proposal.yes_votes = proposal.yes_votes.checked_add(amount)
-                    .ok_or(GovernanceError::Overflow)?;
-            },
-            VoteType::No => {
-                proposal.no_votes = proposal.no_votes.checked_add(amount)
-                    .ok_or(GovernanceError::Overflow)?;
-            },
-            VoteType::Abstain => {
-                proposal.abstain_votes = proposal.abstain_votes.checked_add(amount)
-                    .ok_or(GovernanceError::Overflow)?;
-            },
+            Vote::Yes => proposal.yes_votes = proposal.yes_votes.checked_add(vote_record.weight).unwrap(),
+            Vote::No => proposal.no_votes = proposal.no_votes.checked_add(vote_record.weight).unwrap(),
+            Vote::Abstain => proposal.abstain_votes = proposal.abstain_votes.checked_add(vote_record.weight).unwrap(),
         }
-        
-        // Record voter participation
-        proposal.voters.push(VoterRecord {
-            voter: voter.key(),
-            vote,
-            amount,
-            timestamp: current_time,
-        });
+        proposal.total_votes = proposal.total_votes.checked_add(vote_record.weight).unwrap();
+        proposal.updated_at = current_time;
         
         Ok(())
     }
@@ -93,35 +79,38 @@ pub mod governance {
         let proposal = &mut ctx.accounts.proposal;
         let governance = &mut ctx.accounts.governance;
         
-        // Validate proposal can be finalized
+        // Check if voting period has ended
         let current_time = Clock::get()?.unix_timestamp;
         require!(
             current_time > proposal.voting_end,
-            GovernanceError::VotingStillActive
+            GovernanceError::VotingNotEnded
         );
         
-        // Calculate total votes
-        let total_votes = proposal.yes_votes
-            .checked_add(proposal.no_votes)
-            .and_then(|sum| sum.checked_add(proposal.abstain_votes))
-            .ok_or(GovernanceError::Overflow)?;
+        // Check if proposal is already finalized
+        require!(
+            proposal.status == ProposalStatus::Draft,
+            GovernanceError::AlreadyFinalized
+        );
         
         // Check quorum
+        let total_supply = ctx.accounts.governance_token_mint.supply;
+        let quorum_threshold = total_supply.checked_mul(proposal.quorum as u64).unwrap() / 100;
         require!(
-            total_votes >= proposal.quorum,
+            proposal.total_votes >= quorum_threshold,
             GovernanceError::QuorumNotMet
         );
         
         // Determine outcome
-        if proposal.yes_votes >= proposal.threshold {
+        let yes_percentage = proposal.yes_votes.checked_mul(100).unwrap() / proposal.total_votes;
+        if yes_percentage >= proposal.threshold as u64 {
             proposal.status = ProposalStatus::Passed;
         } else {
             proposal.status = ProposalStatus::Rejected;
         }
         
-        // Update governance state
-        governance.active_proposals = governance.active_proposals.checked_sub(1)
-            .ok_or(GovernanceError::Overflow)?;
+        // Update governance
+        governance.active_proposals = governance.active_proposals.checked_sub(1).unwrap();
+        governance.updated_at = current_time;
         
         Ok(())
     }
@@ -135,65 +124,103 @@ pub struct CreateProposal<'info> {
         space = Proposal::LEN
     )]
     pub proposal: Account<'info, Proposal>,
-    
     #[account(mut)]
     pub governance: Account<'info, Governance>,
-    
     #[account(mut)]
     pub creator: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct CastVote<'info> {
+    #[account(
+        init,
+        payer = voter,
+        space = VoteRecord::LEN
+    )]
+    pub vote_record: Account<'info, VoteRecord>,
     #[account(mut)]
     pub proposal: Account<'info, Proposal>,
-    
     #[account(mut)]
     pub voter: Signer<'info>,
-    
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = voter_token_account.mint == governance_token_mint.key(),
+        constraint = voter_token_account.owner == voter.key()
+    )]
     pub voter_token_account: Account<'info, TokenAccount>,
+    pub governance_token_mint: Account<'info, Mint>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct FinalizeProposal<'info> {
     #[account(mut)]
     pub proposal: Account<'info, Proposal>,
-    
     #[account(mut)]
     pub governance: Account<'info, Governance>,
-    
-    pub finalizer: Signer<'info>,
+    pub governance_token_mint: Account<'info, Mint>,
+}
+
+#[account]
+pub struct Governance {
+    pub admin: Pubkey,
+    pub token_mint: Pubkey,
+    pub active_proposals: u64,
+    pub total_proposals: u64,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[account]
 pub struct Proposal {
     pub creator: Pubkey,
+    pub governance: Pubkey,
     pub title: String,
     pub description: String,
     pub category: ProposalCategory,
     pub status: ProposalStatus,
     pub voting_start: i64,
     pub voting_end: i64,
-    pub quorum: u64,
-    pub threshold: u64,
+    pub quorum: u8,
+    pub threshold: u8,
     pub yes_votes: u64,
     pub no_votes: u64,
     pub abstain_votes: u64,
-    pub voters: Vec<VoterRecord>,
+    pub total_votes: u64,
     pub created_at: i64,
     pub updated_at: i64,
 }
 
 #[account]
-pub struct Governance {
-    pub total_proposals: u64,
-    pub active_proposals: u64,
-    pub total_voters: u64,
+pub struct VoteRecord {
+    pub voter: Pubkey,
+    pub proposal: Pubkey,
+    pub vote: Vote,
+    pub weight: u64,
     pub created_at: i64,
-    pub updated_at: i64,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum ProposalCategory {
+    Protocol,
+    Treasury,
+    Parameter,
+    Other,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum ProposalStatus {
+    Draft,
+    Passed,
+    Rejected,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum Vote {
+    Yes,
+    No,
+    Abstain,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -203,81 +230,57 @@ pub struct ProposalParams {
     pub category: ProposalCategory,
     pub voting_start: i64,
     pub voting_end: i64,
-    pub quorum: u64,
-    pub threshold: u64,
+    pub quorum: u8,
+    pub threshold: u8,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct VoterRecord {
-    pub voter: Pubkey,
-    pub vote: VoteType,
-    pub amount: u64,
-    pub timestamp: i64,
+impl Governance {
+    pub const LEN: usize = 8 + // discriminator
+        32 + // admin
+        32 + // token_mint
+        8 + // active_proposals
+        8 + // total_proposals
+        8 + // created_at
+        8; // updated_at
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum ProposalCategory {
-    ProtocolUpgrade,
-    ParameterChange,
-    Treasury,
-    Community,
-    Other,
+impl Proposal {
+    pub const LEN: usize = 8 + // discriminator
+        32 + // creator
+        32 + // governance
+        4 + 200 + // title (max 200 chars)
+        4 + 1000 + // description (max 1000 chars)
+        1 + // category
+        1 + // status
+        8 + // voting_start
+        8 + // voting_end
+        1 + // quorum
+        1 + // threshold
+        8 + // yes_votes
+        8 + // no_votes
+        8 + // abstain_votes
+        8 + // total_votes
+        8 + // created_at
+        8; // updated_at
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum ProposalStatus {
-    Draft,
-    Active,
-    Passed,
-    Rejected,
-    Cancelled,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum VoteType {
-    Yes,
-    No,
-    Abstain,
+impl VoteRecord {
+    pub const LEN: usize = 8 + // discriminator
+        32 + // voter
+        32 + // proposal
+        1 + // vote
+        8 + // weight
+        8; // created_at
 }
 
 #[error_code]
 pub enum GovernanceError {
     #[msg("Not in voting period")]
     NotInVotingPeriod,
-    #[msg("Proposal is not active")]
-    ProposalNotActive,
-    #[msg("Voting is still active")]
-    VotingStillActive,
+    #[msg("Voting period has not ended")]
+    VotingNotEnded,
+    #[msg("Proposal already finalized")]
+    AlreadyFinalized,
     #[msg("Quorum not met")]
     QuorumNotMet,
-    #[msg("Arithmetic overflow")]
-    Overflow,
-}
-
-impl Proposal {
-    pub const LEN: usize = 8 + // discriminator
-        32 + // creator
-        4 + 100 + // title (max 100 chars)
-        4 + 500 + // description (max 500 chars)
-        1 + // category
-        1 + // status
-        8 + // voting_start
-        8 + // voting_end
-        8 + // quorum
-        8 + // threshold
-        8 + // yes_votes
-        8 + // no_votes
-        8 + // abstain_votes
-        4 + 100 * 64 + // voters (max 100 voters, 64 bytes each)
-        8 + // created_at
-        8; // updated_at
-}
-
-impl Governance {
-    pub const LEN: usize = 8 + // discriminator
-        8 + // total_proposals
-        8 + // active_proposals
-        8 + // total_voters
-        8 + // created_at
-        8; // updated_at
 } 

@@ -1,0 +1,419 @@
+{
+  "address": "5J7J6ReABPxr6ZDoWuokyqwT8M6ehNDQ8fm5GrF9QryK",
+  "metadata": {
+    "name": "lending",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Lending program"
+  },
+  "instructions": [
+    {
+      "name": "approve_loan",
+      "discriminator": [
+        223,
+        27,
+        77,
+        138,
+        94,
+        172,
+        21,
+        209
+      ],
+      "accounts": [
+        {
+          "name": "loan",
+          "writable": true
+        },
+        {
+          "name": "loan_pool",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_loan_pool",
+      "discriminator": [
+        104,
+        146,
+        212,
+        187,
+        156,
+        36,
+        220,
+        6
+      ],
+      "accounts": [
+        {
+          "name": "loan_pool",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "LoanPoolParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "make_payment",
+      "discriminator": [
+        19,
+        128,
+        153,
+        121,
+        221,
+        192,
+        91,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "loan",
+          "writable": true
+        },
+        {
+          "name": "loan_pool",
+          "writable": true
+        },
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "request_loan",
+      "discriminator": [
+        120,
+        2,
+        7,
+        7,
+        1,
+        219,
+        235,
+        187
+      ],
+      "accounts": [
+        {
+          "name": "loan",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "loan_pool",
+          "writable": true
+        },
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Loan",
+      "discriminator": [
+        20,
+        195,
+        70,
+        117,
+        165,
+        227,
+        182,
+        1
+      ]
+    },
+    {
+      "name": "LoanPool",
+      "discriminator": [
+        179,
+        24,
+        123,
+        83,
+        155,
+        186,
+        17,
+        89
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidLoanAmount",
+      "msg": "Invalid loan amount"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidLoanStatus",
+      "msg": "Invalid loan status"
+    },
+    {
+      "code": 6002,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    }
+  ],
+  "types": [
+    {
+      "name": "AssetType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "RealEstate"
+          },
+          {
+            "name": "Vehicle"
+          },
+          {
+            "name": "Equipment"
+          },
+          {
+            "name": "Other"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Loan",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "loan_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "interest_rate",
+            "type": "u64"
+          },
+          {
+            "name": "term",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "LoanStatus"
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoanPool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "interest_rate",
+            "type": "u64"
+          },
+          {
+            "name": "max_loan_amount",
+            "type": "u64"
+          },
+          {
+            "name": "min_loan_amount",
+            "type": "u64"
+          },
+          {
+            "name": "loan_term",
+            "type": "u64"
+          },
+          {
+            "name": "collateral_ratio",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "LoanPoolStatus"
+              }
+            }
+          },
+          {
+            "name": "total_loans",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "available_funds",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoanPoolParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "interest_rate",
+            "type": "u64"
+          },
+          {
+            "name": "max_loan_amount",
+            "type": "u64"
+          },
+          {
+            "name": "min_loan_amount",
+            "type": "u64"
+          },
+          {
+            "name": "loan_term",
+            "type": "u64"
+          },
+          {
+            "name": "collateral_ratio",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoanPoolStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Paused"
+          },
+          {
+            "name": "Closed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoanStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Requested"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Defaulted"
+          }
+        ]
+      }
+    }
+  ]
+}

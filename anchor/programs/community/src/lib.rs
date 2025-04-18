@@ -19,32 +19,32 @@ pub mod community {
         community.description = params.description;
         community.category = params.category;
         community.status = CommunityStatus::Active;
-        community.member_count = 0;
+        community.member_count = 1;
         community.post_count = 0;
-        community.created_at = Clock::get()?.unix_timestamp;
-        community.updated_at = Clock::get()?.unix_timestamp;
         community.rules = params.rules;
         community.tags = params.tags;
-
+        community.created_at = Clock::get()?.unix_timestamp;
+        community.updated_at = Clock::get()?.unix_timestamp;
+        
         Ok(())
     }
 
     pub fn join_community(
         ctx: Context<JoinCommunity>,
     ) -> Result<()> {
-        let community = &mut ctx.accounts.community;
         let membership = &mut ctx.accounts.membership;
+        let community = &mut ctx.accounts.community;
         
         // Initialize membership
-        membership.community = community.key();
         membership.member = ctx.accounts.member.key();
+        membership.community = community.key();
         membership.role = MemberRole::Member;
+        membership.status = MembershipStatus::Active;
         membership.joined_at = Clock::get()?.unix_timestamp;
-        membership.updated_at = Clock::get()?.unix_timestamp;
         
-        // Update community stats
-        community.member_count = community.member_count.checked_add(1)
-            .ok_or(CommunityError::Overflow)?;
+        // Update community
+        community.member_count = community.member_count.checked_add(1).unwrap();
+        community.updated_at = Clock::get()?.unix_timestamp;
         
         Ok(())
     }
@@ -68,16 +68,16 @@ pub mod community {
         post.created_at = Clock::get()?.unix_timestamp;
         post.updated_at = Clock::get()?.unix_timestamp;
         
-        // Update community stats
-        community.post_count = community.post_count.checked_add(1)
-            .ok_or(CommunityError::Overflow)?;
+        // Update community
+        community.post_count = community.post_count.checked_add(1).unwrap();
+        community.updated_at = Clock::get()?.unix_timestamp;
         
         Ok(())
     }
 
     pub fn create_comment(
         ctx: Context<CreateComment>,
-        params: CommentParams,
+        content: String,
     ) -> Result<()> {
         let comment = &mut ctx.accounts.comment;
         let post = &mut ctx.accounts.post;
@@ -85,14 +85,14 @@ pub mod community {
         // Initialize comment
         comment.author = ctx.accounts.author.key();
         comment.post = post.key();
-        comment.content = params.content;
+        comment.content = content;
         comment.status = CommentStatus::Active;
         comment.created_at = Clock::get()?.unix_timestamp;
         comment.updated_at = Clock::get()?.unix_timestamp;
         
-        // Update post stats
-        post.comment_count = post.comment_count.checked_add(1)
-            .ok_or(CommunityError::Overflow)?;
+        // Update post
+        post.comment_count = post.comment_count.checked_add(1).unwrap();
+        post.updated_at = Clock::get()?.unix_timestamp;
         
         Ok(())
     }
@@ -100,17 +100,17 @@ pub mod community {
     pub fn like_post(
         ctx: Context<LikePost>,
     ) -> Result<()> {
-        let post = &mut ctx.accounts.post;
         let like = &mut ctx.accounts.like;
+        let post = &mut ctx.accounts.post;
         
         // Initialize like
         like.user = ctx.accounts.user.key();
         like.post = post.key();
         like.created_at = Clock::get()?.unix_timestamp;
         
-        // Update post stats
-        post.like_count = post.like_count.checked_add(1)
-            .ok_or(CommunityError::Overflow)?;
+        // Update post
+        post.like_count = post.like_count.checked_add(1).unwrap();
+        post.updated_at = Clock::get()?.unix_timestamp;
         
         Ok(())
     }
@@ -124,28 +124,23 @@ pub struct CreateCommunity<'info> {
         space = Community::LEN
     )]
     pub community: Account<'info, Community>,
-    
     #[account(mut)]
     pub creator: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct JoinCommunity<'info> {
-    #[account(mut)]
-    pub community: Account<'info, Community>,
-    
     #[account(
         init,
         payer = member,
         space = Membership::LEN
     )]
     pub membership: Account<'info, Membership>,
-    
+    #[account(mut)]
+    pub community: Account<'info, Community>,
     #[account(mut)]
     pub member: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
@@ -157,13 +152,10 @@ pub struct CreatePost<'info> {
         space = Post::LEN
     )]
     pub post: Account<'info, Post>,
-    
     #[account(mut)]
     pub community: Account<'info, Community>,
-    
     #[account(mut)]
     pub author: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
@@ -175,13 +167,10 @@ pub struct CreateComment<'info> {
         space = Comment::LEN
     )]
     pub comment: Account<'info, Comment>,
-    
     #[account(mut)]
     pub post: Account<'info, Post>,
-    
     #[account(mut)]
     pub author: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
@@ -193,13 +182,10 @@ pub struct LikePost<'info> {
         space = Like::LEN
     )]
     pub like: Account<'info, Like>,
-    
     #[account(mut)]
     pub post: Account<'info, Post>,
-    
     #[account(mut)]
     pub user: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
@@ -220,11 +206,11 @@ pub struct Community {
 
 #[account]
 pub struct Membership {
-    pub community: Pubkey,
     pub member: Pubkey,
+    pub community: Pubkey,
     pub role: MemberRole,
+    pub status: MembershipStatus,
     pub joined_at: i64,
-    pub updated_at: i64,
 }
 
 #[account]
@@ -258,6 +244,58 @@ pub struct Like {
     pub created_at: i64,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum CommunityCategory {
+    General,
+    Technology,
+    Finance,
+    Art,
+    Gaming,
+    Other,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum CommunityStatus {
+    Active,
+    Archived,
+    Banned,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum MemberRole {
+    Admin,
+    Moderator,
+    Member,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum MembershipStatus {
+    Active,
+    Banned,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum PostCategory {
+    Discussion,
+    Question,
+    Announcement,
+    Event,
+    Other,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum PostStatus {
+    Active,
+    Archived,
+    Hidden,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum CommentStatus {
+    Active,
+    Hidden,
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CommunityParams {
     pub name: String,
@@ -272,66 +310,6 @@ pub struct PostParams {
     pub title: String,
     pub content: String,
     pub category: PostCategory,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CommentParams {
-    pub content: String,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum CommunityCategory {
-    General,
-    Investment,
-    Development,
-    Support,
-    Other,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum CommunityStatus {
-    Active,
-    Archived,
-    Banned,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum MemberRole {
-    Admin,
-    Moderator,
-    Member,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum PostCategory {
-    Discussion,
-    Question,
-    Announcement,
-    Resource,
-    Other,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum PostStatus {
-    Active,
-    Archived,
-    Hidden,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum CommentStatus {
-    Active,
-    Hidden,
-}
-
-#[error_code]
-pub enum CommunityError {
-    #[msg("Arithmetic overflow")]
-    Overflow,
-    #[msg("Unauthorized access")]
-    Unauthorized,
-    #[msg("Community is not active")]
-    CommunityNotActive,
 }
 
 impl Community {
@@ -351,11 +329,11 @@ impl Community {
 
 impl Membership {
     pub const LEN: usize = 8 + // discriminator
-        32 + // community
         32 + // member
+        32 + // community
         1 + // role
-        8 + // joined_at
-        8; // updated_at
+        1 + // status
+        8; // joined_at
 }
 
 impl Post {
@@ -363,7 +341,7 @@ impl Post {
         32 + // author
         32 + // community
         4 + 200 + // title (max 200 chars)
-        4 + 2000 + // content (max 2000 chars)
+        4 + 1000 + // content (max 1000 chars)
         1 + // category
         1 + // status
         8 + // like_count
@@ -376,7 +354,7 @@ impl Comment {
     pub const LEN: usize = 8 + // discriminator
         32 + // author
         32 + // post
-        4 + 1000 + // content (max 1000 chars)
+        4 + 500 + // content (max 500 chars)
         1 + // status
         8 + // created_at
         8; // updated_at

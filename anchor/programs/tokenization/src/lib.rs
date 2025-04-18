@@ -7,228 +7,198 @@ declare_id!("7JHfrrDpwArkzZ2dXCpSZoDgcHwBLoMdrcWbRBs3gK4w");
 pub mod tokenization {
     use super::*;
 
-    pub fn initialize_tokenization_project(
-        ctx: Context<InitializeTokenizationProject>,
-        params: TokenizationParams,
+    pub fn create_token(
+        ctx: Context<CreateToken>,
+        params: TokenParams,
     ) -> Result<()> {
-        let project = &mut ctx.accounts.project;
+        let token = &mut ctx.accounts.token_info;
+        let mint = &ctx.accounts.mint;
         
-        // Initialize project details
-        project.owner = ctx.accounts.owner.key();
-        project.name = params.name;
-        project.description = params.description;
-        project.asset_type = params.asset_type;
-        project.status = TokenizationStatus::Draft;
-        project.target_raise = params.target_raise;
-        project.minimum_investment = params.minimum_investment;
-        project.token_price = params.token_price;
-        project.total_tokens = params.total_tokens;
-        project.sold_tokens = 0;
-        project.legal_structure = params.legal_structure;
-        project.jurisdiction = params.jurisdiction;
-        project.risk_level = params.risk_level;
-        project.fees = params.fees;
-        project.created_at = Clock::get()?.unix_timestamp;
-        project.updated_at = Clock::get()?.unix_timestamp;
-
-        Ok(())
-    }
-
-    pub fn update_tokenization_status(
-        ctx: Context<UpdateTokenizationStatus>,
-        new_status: TokenizationStatus,
-    ) -> Result<()> {
-        let project = &mut ctx.accounts.project;
-        require!(
-            project.owner == ctx.accounts.owner.key(),
-            TokenizationError::Unauthorized
-        );
+        // Initialize token
+        token.creator = ctx.accounts.creator.key();
+        token.mint = mint.key();
+        token.name = params.name;
+        token.symbol = params.symbol;
+        token.decimals = params.decimals;
+        token.total_supply = params.total_supply;
+        token.status = TokenStatus::Active;
+        token.created_at = Clock::get()?.unix_timestamp;
+        token.updated_at = Clock::get()?.unix_timestamp;
         
-        project.status = new_status;
-        project.updated_at = Clock::get()?.unix_timestamp;
+        // Initialize mint
+        token::initialize_mint(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::InitializeMint {
+                    mint: mint.to_account_info(),
+                    rent: ctx.accounts.rent.to_account_info(),
+                },
+            ),
+            params.decimals,
+            &ctx.accounts.creator.key(),
+            Some(&ctx.accounts.creator.key()),
+        )?;
         
-        Ok(())
-    }
-
-    pub fn invest_in_project(
-        ctx: Context<InvestInProject>,
-        amount: u64,
-    ) -> Result<()> {
-        let project = &mut ctx.accounts.project;
-        let investor = &mut ctx.accounts.investor;
-        
-        // Validate investment amount
-        require!(
-            amount >= project.minimum_investment,
-            TokenizationError::InvestmentBelowMinimum
-        );
-        
-        // Calculate tokens to mint
-        let tokens_to_mint = amount.checked_div(project.token_price)
-            .ok_or(TokenizationError::Overflow)?;
-            
-        // Mint tokens to investor
+        // Mint initial supply
         token::mint_to(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
                 token::MintTo {
-                    mint: ctx.accounts.token_mint.to_account_info(),
-                    to: ctx.accounts.investor_token_account.to_account_info(),
-                    authority: ctx.accounts.project.to_account_info(),
+                    mint: mint.to_account_info(),
+                    to: ctx.accounts.creator_token_account.to_account_info(),
+                    authority: ctx.accounts.creator.to_account_info(),
                 },
             ),
-            tokens_to_mint,
+            params.total_supply,
         )?;
         
-        // Update project state
-        project.sold_tokens = project.sold_tokens.checked_add(tokens_to_mint)
-            .ok_or(TokenizationError::Overflow)?;
-            
+        Ok(())
+    }
+
+    pub fn transfer_tokens(
+        ctx: Context<TransferTokens>,
+        amount: u64,
+    ) -> Result<()> {
+        // Transfer tokens
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.from.to_account_info(),
+                    to: ctx.accounts.to.to_account_info(),
+                    authority: ctx.accounts.authority.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+        
+        Ok(())
+    }
+
+    pub fn burn_tokens(
+        ctx: Context<BurnTokens>,
+        amount: u64,
+    ) -> Result<()> {
+        // Burn tokens
+        token::burn(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Burn {
+                    mint: ctx.accounts.mint.to_account_info(),
+                    from: ctx.accounts.from.to_account_info(),
+                    authority: ctx.accounts.authority.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+        
+        // Update token supply
+        let token = &mut ctx.accounts.token_info;
+        token.total_supply = token.total_supply.checked_sub(amount).unwrap();
+        token.updated_at = Clock::get()?.unix_timestamp;
+        
         Ok(())
     }
 }
 
 #[derive(Accounts)]
-pub struct InitializeTokenizationProject<'info> {
+pub struct CreateToken<'info> {
     #[account(
         init,
-        payer = owner,
-        space = TokenizationProject::LEN
+        payer = creator,
+        space = TokenInfo::LEN
     )]
-    pub project: Account<'info, TokenizationProject>,
-    
+    pub token_info: Account<'info, TokenInfo>,
+    #[account(
+        init,
+        payer = creator,
+        space = 82
+    )]
+    pub mint: Account<'info, Mint>,
+    #[account(
+        init,
+        payer = creator,
+        space = 165
+    )]
+    pub creator_token_account: Account<'info, TokenAccount>,
     #[account(mut)]
-    pub owner: Signer<'info>,
-    
+    pub creator: Signer<'info>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
-pub struct UpdateTokenizationStatus<'info> {
+pub struct TransferTokens<'info> {
     #[account(mut)]
-    pub project: Account<'info, TokenizationProject>,
-    pub owner: Signer<'info>,
+    pub from: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub to: Account<'info, TokenAccount>,
+    pub authority: Signer<'info>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
-pub struct InvestInProject<'info> {
+pub struct BurnTokens<'info> {
     #[account(mut)]
-    pub project: Account<'info, TokenizationProject>,
-    
+    pub token_info: Account<'info, TokenInfo>,
     #[account(mut)]
-    pub investor: Signer<'info>,
-    
+    pub mint: Account<'info, Mint>,
     #[account(mut)]
-    pub token_mint: Account<'info, Mint>,
-    
-    #[account(mut)]
-    pub investor_token_account: Account<'info, TokenAccount>,
-    
+    pub from: Account<'info, TokenAccount>,
+    pub authority: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
 
 #[account]
-pub struct TokenizationProject {
-    pub owner: Pubkey,
+pub struct TokenInfo {
+    pub creator: Pubkey,
+    pub mint: Pubkey,
     pub name: String,
-    pub description: String,
-    pub asset_type: TokenizedAssetType,
-    pub status: TokenizationStatus,
-    pub target_raise: u64,
-    pub minimum_investment: u64,
-    pub token_price: u64,
-    pub total_tokens: u64,
-    pub sold_tokens: u64,
-    pub legal_structure: String,
-    pub jurisdiction: String,
-    pub risk_level: RiskLevel,
-    pub fees: TokenizationFees,
+    pub symbol: String,
+    pub decimals: u8,
+    pub total_supply: u64,
+    pub status: TokenStatus,
     pub created_at: i64,
     pub updated_at: i64,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct TokenizationParams {
-    pub name: String,
-    pub description: String,
-    pub asset_type: TokenizedAssetType,
-    pub target_raise: u64,
-    pub minimum_investment: u64,
-    pub token_price: u64,
-    pub total_tokens: u64,
-    pub legal_structure: String,
-    pub jurisdiction: String,
-    pub risk_level: RiskLevel,
-    pub fees: TokenizationFees,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum TokenizedAssetType {
-    RealEstate,
-    Equity,
-    Debt,
-    Commodity,
-    Art,
-    IntellectualProperty,
-    Infrastructure,
-    Other,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum TokenizationStatus {
-    Draft,
-    PendingReview,
-    Approved,
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum TokenStatus {
     Active,
-    Funded,
-    Completed,
-    Rejected,
-    Cancelled,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum RiskLevel {
-    Low,
-    Medium,
-    High,
-    VeryHigh,
+    Paused,
+    Frozen,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct TokenizationFees {
-    pub platform_fee: u64,
-    pub management_fee: u64,
-    pub performance_fee: u64,
-    pub entry_fee: u64,
-    pub exit_fee: u64,
+pub struct TokenParams {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+    pub total_supply: u64,
+}
+
+impl TokenInfo {
+    pub const LEN: usize = 8 + // discriminator
+        32 + // creator
+        32 + // mint
+        4 + 100 + // name (max 100 chars)
+        4 + 10 + // symbol (max 10 chars)
+        1 + // decimals
+        8 + // total_supply
+        1 + // status
+        8 + // created_at
+        8; // updated_at
 }
 
 #[error_code]
 pub enum TokenizationError {
-    #[msg("Unauthorized access")]
-    Unauthorized,
-    #[msg("Investment amount below minimum")]
-    InvestmentBelowMinimum,
-    #[msg("Arithmetic overflow")]
-    Overflow,
-}
-
-impl TokenizationProject {
-    pub const LEN: usize = 8 + // discriminator
-        32 + // owner
-        4 + 100 + // name (max 100 chars)
-        4 + 500 + // description (max 500 chars)
-        1 + // asset_type
-        1 + // status
-        8 + // target_raise
-        8 + // minimum_investment
-        8 + // token_price
-        8 + // total_tokens
-        8 + // sold_tokens
-        4 + 50 + // legal_structure (max 50 chars)
-        4 + 50 + // jurisdiction (max 50 chars)
-        1 + // risk_level
-        40 + // fees
-        8 + // created_at
-        8; // updated_at
+    #[msg("Invalid token amount")]
+    InvalidAmount,
+    #[msg("Insufficient balance")]
+    InsufficientBalance,
+    #[msg("Token is paused")]
+    TokenPaused,
+    #[msg("Token is frozen")]
+    TokenFrozen,
 } 
