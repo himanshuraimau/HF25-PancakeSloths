@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
-declare_id!("Community1111111111111111111111111111111111");
+declare_id!("GiEVmbRtjqkLHkUGTqx4KBr7bZ43kMep8Mzs1TvRbcCJ");
 
 #[program]
 pub mod community {

@@ -6,7 +6,26 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-basic = "6z68wfurCMYkZG51s1Et9BJEd9nJGUusjHXNt4dGbNNF"
+community = "GiEVmbRtjqkLHkUGTqx4KBr7bZ43kMep8Mzs1TvRbcCJ"
+lending = "5J7J6ReABPxr6ZDoWuokyqwT8M6ehNDQ8fm5GrF9QryK"
+governance = "BMgw77fmd4FubdeFcZKixH5gnYY76Z11w12hwtqiQ5qU"
+user = "598Swc49CxCyKgdqA3LCLSYQu8r6sninckgSeZdisjiP"
+tokenization = "7JHfrrDpwArkzZ2dXCpSZoDgcHwBLoMdrcWbRBs3gK4w"
+
+[programs.devnet]
+community = "GiEVmbRtjqkLHkUGTqx4KBr7bZ43kMep8Mzs1TvRbcCJ"
+lending = "5J7J6ReABPxr6ZDoWuokyqwT8M6ehNDQ8fm5GrF9QryK"
+governance = "BMgw77fmd4FubdeFcZKixH5gnYY76Z11w12hwtqiQ5qU"
+user = "598Swc49CxCyKgdqA3LCLSYQu8r6sninckgSeZdisjiP"
+tokenization = "7JHfrrDpwArkzZ2dXCpSZoDgcHwBLoMdrcWbRBs3gK4w"
+
+[programs.mainnet]
+community = "GiEVmbRtjqkLHkUGTqx4KBr7bZ43kMep8Mzs1TvRbcCJ"
+lending = "5J7J6ReABPxr6ZDoWuokyqwT8M6ehNDQ8fm5GrF9QryK"
+governance = "BMgw77fmd4FubdeFcZKixH5gnYY76Z11w12hwtqiQ5qU"
+user = "598Swc49CxCyKgdqA3LCLSYQu8r6sninckgSeZdisjiP"
+tokenization = "7JHfrrDpwArkzZ2dXCpSZoDgcHwBLoMdrcWbRBs3gK4w"
+
 
 [registry]
 url = "https://api.apr.dev"
