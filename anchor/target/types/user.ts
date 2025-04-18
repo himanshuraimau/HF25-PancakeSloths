@@ -81,6 +81,12 @@ export type User = {
         {
           "name": "secret",
           "type": "string"
+        },
+        {
+          "name": "backupCodes",
+          "type": {
+            "vec": "string"
+          }
         }
       ]
     },
@@ -194,6 +200,23 @@ export type User = {
       }
     },
     {
+      "name": "kycStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "pending"
+          },
+          {
+            "name": "verified"
+          },
+          {
+            "name": "rejected"
+          }
+        ]
+      }
+    },
+    {
       "name": "userProfile",
       "type": {
         "kind": "struct",
@@ -235,8 +258,22 @@ export type User = {
             "type": "string"
           },
           {
+            "name": "twoFactorBackupCodes",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
             "name": "kycVerified",
             "type": "bool"
+          },
+          {
+            "name": "kycStatus",
+            "type": {
+              "defined": {
+                "name": "kycStatus"
+              }
+            }
           },
           {
             "name": "kycData",
@@ -245,6 +282,10 @@ export type User = {
                 "name": "kycData"
               }
             }
+          },
+          {
+            "name": "accreditedStatus",
+            "type": "bool"
           },
           {
             "name": "createdAt",

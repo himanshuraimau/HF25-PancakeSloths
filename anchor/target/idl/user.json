@@ -75,6 +75,12 @@
         {
           "name": "secret",
           "type": "string"
+        },
+        {
+          "name": "backup_codes",
+          "type": {
+            "vec": "string"
+          }
         }
       ]
     },
@@ -188,6 +194,23 @@
       }
     },
     {
+      "name": "KycStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "Verified"
+          },
+          {
+            "name": "Rejected"
+          }
+        ]
+      }
+    },
+    {
       "name": "UserProfile",
       "type": {
         "kind": "struct",
@@ -229,8 +252,22 @@
             "type": "string"
           },
           {
+            "name": "two_factor_backup_codes",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
             "name": "kyc_verified",
             "type": "bool"
+          },
+          {
+            "name": "kyc_status",
+            "type": {
+              "defined": {
+                "name": "KycStatus"
+              }
+            }
           },
           {
             "name": "kyc_data",
@@ -239,6 +276,10 @@
                 "name": "KycData"
               }
             }
+          },
+          {
+            "name": "accredited_status",
+            "type": "bool"
           },
           {
             "name": "created_at",
