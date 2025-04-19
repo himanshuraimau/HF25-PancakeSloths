@@ -1,8 +1,17 @@
 {
   "compilerOptions": {
-    "types": ["jest", "node", "chai", "chai-as-promised"],
-    "typeRoots": ["./node_modules/@types"],
-    "lib": ["es2015"],
+    "types": [
+      "jest",
+      "node",
+      "chai",
+      "chai-as-promised"
+    ],
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
+    "lib": [
+      "es2015"
+    ],
     "module": "commonjs",
     "target": "es6",
     "esModuleInterop": true,
@@ -12,12 +21,28 @@
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
     "moduleResolution": "node",
     "allowJs": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "noEmit": true,
+    "incremental": true,
+    "jsx": "preserve",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
-  "include": ["tests", "src"],
-  "exclude": ["node_modules"]
+  "include": [
+    "tests",
+    "src",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
