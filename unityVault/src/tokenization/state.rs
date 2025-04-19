@@ -105,10 +105,14 @@ impl Pack for TokenInfo {
         let is_initialized = src[offset] != 0;
         offset += 1;
         
-        let creator = Pubkey::new(&src[offset..offset + 32]);
+        let creator_bytes: [u8; 32] = src[offset..offset + 32].try_into()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let creator = Pubkey::from(creator_bytes);
         offset += 32;
         
-        let mint = Pubkey::new(&src[offset..offset + 32]);
+        let mint_bytes: [u8; 32] = src[offset..offset + 32].try_into()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let mint = Pubkey::from(mint_bytes);
         offset += 32;
         
         // Unpack name

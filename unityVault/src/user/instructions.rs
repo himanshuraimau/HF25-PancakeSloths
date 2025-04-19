@@ -18,7 +18,7 @@ pub struct UserProfileParams {
 }
 
 pub fn create_user_profile(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     params: UserProfileParams,
 ) -> ProgramResult {
@@ -68,7 +68,7 @@ pub fn create_user_profile(
 }
 
 pub fn update_user_profile(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     params: UserProfileParams,
 ) -> ProgramResult {
@@ -101,7 +101,7 @@ pub fn update_user_profile(
 }
 
 pub fn enable_two_factor(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     secret: String,
     backup_codes: Vec<String>,
@@ -135,7 +135,7 @@ pub fn enable_two_factor(
 }
 
 pub fn verify_kyc(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     kyc_data: KycData,
 ) -> ProgramResult {

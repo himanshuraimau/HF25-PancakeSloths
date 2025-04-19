@@ -141,13 +141,19 @@ impl Pack for LendingPool {
         let is_initialized = src[offset] != 0;
         offset += 1;
         
-        let authority = Pubkey::new(&src[offset..offset + 32]);
+        let authority_bytes: [u8; 32] = src[offset..offset + 32].try_into()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let authority = Pubkey::from(authority_bytes);
         offset += 32;
         
-        let token_mint = Pubkey::new(&src[offset..offset + 32]);
+        let token_mint_bytes: [u8; 32] = src[offset..offset + 32].try_into()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let token_mint = Pubkey::from(token_mint_bytes);
         offset += 32;
         
-        let token_vault = Pubkey::new(&src[offset..offset + 32]);
+        let token_vault_bytes: [u8; 32] = src[offset..offset + 32].try_into()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let token_vault = Pubkey::from(token_vault_bytes);
         offset += 32;
         
         let interest_rate = u64::from_le_bytes(src[offset..offset + 8].try_into().unwrap());
@@ -228,10 +234,14 @@ impl Pack for Loan {
         let is_initialized = src[offset] != 0;
         offset += 1;
         
-        let borrower = Pubkey::new(&src[offset..offset + 32]);
+        let borrower_bytes: [u8; 32] = src[offset..offset + 32].try_into()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let borrower = Pubkey::from(borrower_bytes);
         offset += 32;
         
-        let lending_pool = Pubkey::new(&src[offset..offset + 32]);
+        let lending_pool_bytes: [u8; 32] = src[offset..offset + 32].try_into()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let lending_pool = Pubkey::from(lending_pool_bytes);
         offset += 32;
         
         let amount = u64::from_le_bytes(src[offset..offset + 8].try_into().unwrap());

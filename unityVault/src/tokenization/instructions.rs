@@ -57,7 +57,7 @@ pub fn create_token<'a>(
 pub fn transfer_tokens<'a>(
     program_id: &Pubkey,
     accounts: &'a [AccountInfo<'a>],
-    amount: u64,
+    _amount: u64,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     

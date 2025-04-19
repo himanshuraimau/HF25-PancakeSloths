@@ -11,7 +11,7 @@ use crate::governance::state::{Proposal, ProposalParams, ProposalStatus, VoteTyp
 use crate::governance::context::{CreateProposalContext, UpdateProposalContext, VoteProposalContext};
 
 pub fn create_proposal(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     params: ProposalParams,
 ) -> ProgramResult {
@@ -56,7 +56,7 @@ pub fn create_proposal(
 }
 
 pub fn update_proposal(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     params: ProposalParams,
 ) -> ProgramResult {
@@ -91,7 +91,7 @@ pub fn update_proposal(
 }
 
 pub fn vote_proposal(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     vote_type: VoteType,
 ) -> ProgramResult {
