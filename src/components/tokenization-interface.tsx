@@ -82,7 +82,7 @@ export function TokenizationInterface() {
         <p className="mt-2 text-slate-400">Transform real-world value into digital tokens</p>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-1 max-w-[40vw] mx-auto">
         <div>
           <Card>
             <CardHeader>
@@ -527,15 +527,6 @@ export function TokenizationInterface() {
               )}
             </CardFooter>
           </Card>
-        </div>
-
-        <div className="h-[600px] rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 p-4">
-          <TokenizationScene
-            step={step}
-            assetType={assetType}
-            assetValue={assetValue}
-            tokenizationPercent={tokenizationPercent}
-          />
         </div>
       </div>
     </div>
