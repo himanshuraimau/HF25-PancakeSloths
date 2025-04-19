@@ -11,6 +11,7 @@ pub mod user;
 pub mod governance;
 pub mod community;
 pub mod lending;
+pub mod tokenization;
 
 
 entrypoint!(process_instruction);
@@ -74,6 +75,17 @@ pub fn process_instruction<'a>(
                 lending::instructions::repay_loan(program_id, accounts)
             }
         },
+        Instruction::Tokenization(tokenization_instruction) => match tokenization_instruction {
+            TokenizationInstruction::CreateToken(params) => {
+                tokenization::instructions::create_token(program_id, accounts, params)
+            }
+            TokenizationInstruction::TransferTokens(amount) => {
+                tokenization::instructions::transfer_tokens(program_id, accounts, amount)
+            }
+            TokenizationInstruction::BurnTokens(amount) => {
+                tokenization::instructions::burn_tokens(program_id, accounts, amount)
+            }
+        },
     }
 }
 
@@ -83,6 +95,7 @@ pub enum Instruction {
     Governance(GovernanceInstruction),
     Community(CommunityInstruction),
     Lending(LendingInstruction),
+    Tokenization(TokenizationInstruction),
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -115,4 +128,11 @@ pub enum LendingInstruction {
     InitLendingPool(crate::lending::state::LendingPoolParams),
     CreateLoan(crate::lending::state::LoanParams),
     RepayLoan,
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub enum TokenizationInstruction {
+    CreateToken(crate::tokenization::state::TokenParams),
+    TransferTokens(u64),
+    BurnTokens(u64),
 }
